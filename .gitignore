@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual env
+venv/
+.env
+.env.*
+
+# Mac
+.DS_Store
+
+# Streamlit
+.streamlit/
+
+# Chroma / vector db
+data/chroma_db/
+
+# Sample data
+sample_data/

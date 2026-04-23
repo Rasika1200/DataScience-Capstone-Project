@@ -1,51 +1,36 @@
-# Proposal
+# AI-Powered ContractOps Copilot
 
-ContractOps Copilot: Machine Learning-Driven Contract Understanding and Workflow Automation
+## Overview
+**ContractOps Copilot** is a high-performance, full-stack enterprise application designed to ingest, analyze, and interrogate complex legal contracts instantly. Built for the DATS 6501 Capstone project at GWU, the platform seamlessly replaces hours of manual legal review with a robust Retrieval-Augmented Generation (RAG) pipeline and mathematical risk mapping.
 
-1. Problem Statement and Motivation -
+## Key Features
 
-Contract review is a critical but time-intensive process across legal, procurement, and compliance workflows. Documents such as NDAs, MSAs, and data-sharing agreements are lengthy, heterogeneous, and semantically complex, requiring significant manual effort to identify specific clauses and verify critical terms. From a machine learning perspective, this presents challenges, including long-document understanding, sparse annotations, domain-specific language, and the need for citation faithfulness. While large language models show promise, their reliability for structured extraction and grounded question answering in legal documents remains an active research area. This project addresses these challenges through systematic ML evaluation and practical system development.
+1. **Intelligent Document Extraction**
+   - Automatically parses dense unstructured PDF and Word (.docx) documents.
+   - Converts legal jargon into deterministic, overlapping semantic chunks mapped against canonical clause definitions.
+   
+2. **Dynamic Risk Dashboarding**
+   - Heuristically scores the liability and threat vectors (0.0 to 1.0) of extracted clauses.
+   - Instantly aggregates the contract's posture into an overarching **Overall Risk Level** with natively generated visual distribution charts (Pandas/Plotly).
 
-2. Project Objectives -
+3. **Semantic RAG Conversational Engine**
+   - Embeds document chunks using HuggingFace's `all-MiniLM-L6-v2` dense local index (via ChromaDB).
+   - Generates answers using Groq Cloud's *Llama 3.1 8B* architecture with absolute hallucination barriers (`"If context does not contain the answer, do not guess."`).
 
-• Model Development: Develop and compare baseline (TF-IDF, rule-based) and deep learning approaches (transformer-based classification, sequence labelling) for contract clause extraction
+4. **Speech-to-Text & Text-to-Speech (STT/TTS)**
+   - Speak directly to your document using an integrated frontend microphone tied to **OpenAI Whisper** for natural language translation.
+   - **Offline Pyttsx3 TTS** dynamically auto-generates readable `.wav` audio to speak the contract's summaries entirely offline.
 
-• RAG Pipeline: Design a retrieval-augmented generation pipeline with citation-grounded question answering
+5. **Human-In-The-Loop (HITL) Validation**
+   - Legal operators aren't sidelined. Users actively 'Accept', 'Edit', or 'Reject' the AI's determinations.
+   - Audits are persisted indefinitely utilizing a discrete SQLite database architecture for real-time human reliability indexing.
 
-• Rigorous Evaluation: Conduct a comprehensive evaluation using precision, recall, F1-score, retrieval metrics, citation correctness, and error analysis
+6. **Hybrid System Resiliency**
+   - In the event of network disruption or Cloud API rate limits, the platform's backend catches the pipeline exception and instantly triggers a local, offline **Ollama** engine (`Llama 3.2 3B`) with expanded 8K token context scaling to maintain 100% operational uptime.
 
-• Human-in-the-Loop Integration: Build a web application integrating ML outputs into a practical workflow with contract intake, automated inference, reviewer validation, and audit logging
-
-3. Dataset and Methodology -
-
-Data Sources: 
-Publicly available legal text datasets, including the Contract Understanding Atticus Dataset (CUAD) with expert annotations for 41 clause types, SEC EDGAR filings, and open-source legal repositories. No private or proprietary data will be used.
-
-Data Pipeline:
-PDF/DOCX parsing, text normalisation, document chunking with semantic segmentation, label alignment, and stratified train/validation/test splits.
-
-Baseline Models:
-TF-IDF with Logistic Regression and rule-based pattern matching for performance benchmarks.
-
-Deep Learning:
-Fine-tuning transformer models (BERT, RoBERTa, Legal-BERT) for multi-label classification and BIO tagging for clause boundary detection. Investigation of long-document architectures (Longformer).
-
-RAG Implementation:
-Vector embeddings for semantic search, dense retrieval for relevant clause identification, and generation with explicit source attribution.
-
-Evaluation:
-Baseline comparison, ablation studies, robustness testing across contract types, and detailed failure mode analysis.
-
-4. System Architecture and Implementation -
-
-Technology Stack: 
-Python backend (FastAPI/Flask), PyTorch/TensorFlow with Hugging Face Transformers, vector database (Pinecone/FAISS), React/Vue.js frontend, Docker containerization, cloud deployment (AWS/GCP/Azure).
-
-Workflow: 
-The web application will support contract upload, automated ML inference, an interactive review interface with confidence scores, natural-language question answering with citations, and comprehensive audit logging for accountability.
-
-5. Expected Outcomes -
-
-This project demonstrates applied deep learning for long-document understanding in a specialised domain, rigorous comparative evaluation of ML approaches, and responsible AI integration with human oversight and transparency. The resulting system serves as a production-quality portfolio piece showcasing end-to-end data science capabilities—from problem formulation through deployment—and readiness for industry data science roles. The project synthesises knowledge from machine learning, deep learning, NLP, and software engineering coursework while providing practical experience with state-of-the-art tools and ML development best practices.
-
-
+## Tech Stack
+*   **Frontend/Orchestration:** Streamlit, Custom Glassmorphism CSS, Plotly
+*   **AI Models:** Groq Cloud API (Llama 3.1), Local Ollama (Llama 3.2), Whisper
+*   **Information Retrieval:** ChromaDB, HuggingFace SentenceTransformers
+*   **Data Processing:** PyMuPDF (`fitz`), Python-docx, Pandas, NumPy
+*   **State Persistence:** SQLite3
