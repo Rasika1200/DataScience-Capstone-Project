@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 st.set_page_config(
-    page_title="AI Contract Review",
+    page_title="ClauseWise Copilot",
     page_icon="📋",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -304,8 +304,8 @@ for k, v in _defaults.items():
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("### 📋 AI Contract Review")
-    st.caption("AI-powered contract analysis")
+    st.markdown("### 📋 ClauseWise")
+    st.caption("AI-powered document analysis")
     st.divider()
     if st.session_state.contract_name:
         st.success(f"📄 {st.session_state.contract_name[:28]}")
@@ -346,7 +346,7 @@ page = st.session_state.page
 if page == "upload":
     st.markdown("""
         <div style='text-align: center; padding: 3rem 0 2rem 0;'>
-            <h1 style='font-size: 3.5rem; color: #3b82f6; margin-bottom: 0.5rem;'>AI Contract Review</h1>
+            <h1 style='font-size: 3.5rem; color: #3b82f6; margin-bottom: 0.5rem;'>ClauseWise</h1>
             <p style='font-size: 1.25rem; color: #9ca3af; font-weight: 400;'>Instantly analyze, extract, and chat with your legal documents using advanced AI.</p>
         </div>
     """, unsafe_allow_html=True)
