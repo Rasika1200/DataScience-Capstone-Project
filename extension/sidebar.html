@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ClauseWise Scanner</title>
+    <link rel="stylesheet" href="sidebar.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="header">
+        <h1>ClauseWise</h1>
+        <p>Risk Intelligence Scanner</p>
+        <span id="close-btn">&times;</span>
+    </div>
+
+    <div id="action-area">
+        <div class="intro-block">Scan this page for contract risks, fairness, and key clauses.</div>
+        <button id="scan-btn" class="primary-btn">Scan Current Page</button>
+        <div id="status-msg" class="hidden muted-text status-msg">Scanning document...</div>
+    </div>
+
+    <div id="dashboard" class="hidden">
+        
+        <div class="section-title">PRIMARY RISK ASSESSMENT</div>
+        <div id="executive-summary" class="body-text">No analysis found.</div>
+        
+        <hr>
+
+        <div class="section-title">OVERALL RISK</div>
+        <div class="risk-card">
+            <div class="status-row">
+                <div id="risk-dot" class="status-dot bg-med"></div>
+                <div id="risk-level" class="status-text color-med">MODERATE Risk</div>
+            </div>
+            <div id="risk-desc" class="muted-text" style="margin-top: 8px;">Awaiting analysis details...</div>
+            <div id="risk-sources" class="source-text" style="color: #94a3b8; font-size: 11px; margin-top: 4px;"></div>
+        </div>
+
+        <hr>
+
+        <div class="section-title flex-between">
+            <span>FAIRNESS & BALANCE</span>
+        </div>
+        <div id="fairness-val" class="body-text fairness-val-text">Balanced</div>
+        <button id="fairness-toggle" class="toggle-btn">⌄ View details</button>
+        <div id="fairness-details" class="collapsible-content hidden muted-text">
+            <div id="fairness-reason">No further details provided.</div>
+            <div id="fairness-sources" class="source-text" style="color: #94a3b8; font-size: 11px; margin-top: 8px;"></div>
+        </div>
+
+        <hr>
+
+        <div class="section-title flex-between">
+            <span>QUICK QUESTIONS</span>
+        </div>
+        <button id="qa-toggle" class="toggle-btn qa-toggle-btn">⌄ Open Chat</button>
+        
+        <div id="qa-container" class="collapsible-content hidden qa-container-padded">
+            <p class="muted-text qa-instruction">💡 Try asking:</p>
+            <div id="suggestions" class="suggestions-box">
+                <!-- Dynamically populated via JS -->
+            </div>
+            
+            <hr>
+            <p class="muted-text qa-instruction">Or ask your own question:</p>
+            <div class="qa-input-row">
+                <input type="text" id="qa-input" class="qa-input-field" placeholder='e.g., "What are the payment terms?"...'>
+                <button id="qa-btn" class="ask-btn qa-submit-btn" title="Send Question">➤</button>
+            </div>
+            
+            <div id="qa-answer" class="hidden"></div>
+        </div>
+
+    </div>
+
+    <script src="sidebar.js"></script>
+</body>
+</html>

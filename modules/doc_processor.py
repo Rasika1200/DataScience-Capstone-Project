@@ -107,6 +107,16 @@ def chunk_pages(
     return chunks
 
 
+def process_raw_text(text: str, source_file: str = "Webpage_Text", chunk_size: int = 500, overlap: int = 80) -> List[Chunk]:
+    """
+    Process raw text strings directly, bypassing PDF/DOCX extraction.
+    Used for extracting text from the Chrome Extension DOM.
+    """
+    cleaned_text = _clean_text(text)
+    pages = [{"page_num": 1, "text": cleaned_text}]
+    return chunk_pages(pages, source_file=source_file, chunk_size=chunk_size, overlap=overlap)
+
+
 def process_contract(file_path: str, chunk_size: int = 500, overlap: int = 80) -> List[Chunk]:
     """
     End-to-end: extract text from file and return overlapping chunks.

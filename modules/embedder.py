@@ -14,7 +14,7 @@ import hashlib
 import warnings
 import numpy as np
 import chromadb
-import streamlit as st
+# streamlit removed to avoid deadlocks in FastAPI
 from typing import List, Dict, Optional
 from dotenv import load_dotenv
 
@@ -26,14 +26,16 @@ CHROMA_DIR = None
 COLLECTION_NAME = "contract_chunks_semantic"
 
 
-# ── SEMANTIC EMBEDDINGS (STREAMLIT CACHED) ────────────────────────────────────
-@st.cache_resource
+_embedding_model = None
+
 def get_embedding_model():
-    from sentence_transformers import SentenceTransformer
-    # Using a fast, local semantic embedding model.
-    # Cached globally by Streamlit to prevent PyTorch thread deadlocks on Mac.
-    model = SentenceTransformer("all-MiniLM-L6-v2")
-    return model
+    global _embedding_model
+    if _embedding_model is None:
+        from sentence_transformers import SentenceTransformer
+        # Using a fast, local semantic embedding model.
+        # Cached globally to prevent PyTorch thread deadlocks on Mac.
+        _embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+    return _embedding_model
 
 def embed_texts(texts: List[str]) -> List[List[float]]:
     """
@@ -55,14 +57,19 @@ def embed_texts(texts: List[str]) -> List[List[float]]:
     return embeddings.tolist()
 
 
-# ── ChromaDB helpers (NO CACHE) ───────────────────────────────────────────────
-@st.cache_resource
+_chroma_client = None
+
 def _get_chroma_client():
+    global _chroma_client
+    if _chroma_client is not None:
+        return _chroma_client
+        
     if CHROMA_DIR:
         os.makedirs(CHROMA_DIR, exist_ok=True)
-        return chromadb.PersistentClient(path=CHROMA_DIR)
+        _chroma_client = chromadb.PersistentClient(path=CHROMA_DIR)
     else:
-        return chromadb.Client()
+        _chroma_client = chromadb.Client()
+    return _chroma_client
 
 
 def get_collection() -> chromadb.Collection:

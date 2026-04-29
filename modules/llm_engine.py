@@ -72,16 +72,32 @@ def call_llm(prompt, json_mode=False):
 
 # ── Safe JSON parsing ─────────────────────────────────────────────────────────
 def _parse_json(raw: str) -> dict:
+    """Robustly parse JSON from LLM output, handling markdown blocks."""
     text = raw.strip()
-
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-    if match:
+    
+    # Remove markdown code blocks if present
+    if text.startswith("```"):
+        # Match ```json ... ``` or just ``` ... ```
+        match = re.search(r"```(?:json)?\s*(.*?)\s*```", text, re.DOTALL)
+        if match:
+            text = match.group(1)
+    
+    # Find the first { and last }
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1:
+        json_str = text[start:end+1]
         try:
-            return json.loads(match.group())
-        except Exception:
+            return json.loads(json_str)
+        except Exception as e:
+            print(f"JSON partial parse error: {e}")
             pass
 
-    raise ValueError("Could not parse JSON")
+    # Final fallback attempt
+    try:
+        return json.loads(text)
+    except Exception:
+        raise ValueError(f"Could not parse JSON from: {raw[:100]}...")
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
@@ -99,6 +115,13 @@ class ContractAnalysis(BaseModel):
     contract_name: str
     overall_risk_level: str
     executive_summary: str
+    completeness_assessment: Optional[str] = None
+    risk_assessment: Optional[str] = None
+    risk_sources: List[str] = []
+    readability_assessment: Optional[str] = None
+    fairness_summary: Optional[str] = None
+    fairness_details: Optional[str] = None
+    fairness_sources: List[str] = []
     clauses: List[ExtractedClause]
     red_flags: List[str]
     missing_clauses: List[str]
@@ -126,12 +149,11 @@ def verify_document_type(text: str):
     """
     try:
         result = call_llm(prompt, json_mode=True)
-        import json
-        data = json.loads(result)
-        return dict(
-            is_contract=data.get("is_contract", True),
-            reason=data.get("reason", "Analysis passed.")
-        )
+        data = _parse_json(result)
+        return {
+            "is_contract": data.get("is_contract", True),
+            "reason": data.get("reason", "Analysis passed.")
+        }
     except Exception as e:
         print("Verification failed, assuming it is a contract:", e)
         return {"is_contract": True, "reason": "Verification bypassed due to error."}
@@ -139,7 +161,8 @@ def verify_document_type(text: str):
 # ── Clause extraction (SAFE) ───────────────────────────────────────────────────
 def extract_clauses(text, contract_name="Contract"):
     prompt = f"""
-    Act as an expert legal reviewer. Extract the 3 to 5 most critical clauses from this contract text.
+    Act as an expert AI Contract Reviewer. Extract the 3 to 5 most critical clauses from this document text.
+    Disclaimer: You are a technical analysis tool, not a lawyer. You do not provide legal advice.
     For each clause, provide:
     - clause_type (e.g. Liability, Termination, Payment, Confidentiality, IP)
     - summary (a concise 1-sentence summary of the clause's effect)
@@ -148,23 +171,32 @@ def extract_clauses(text, contract_name="Contract"):
     - risk_explanation (1 brief sentence explaining why it is this risk level)
     - confidence_score (a float from 0.0 to 1.0 indicating your certainty in this extraction)
 
-    Contract Text:
+    Also, provide 5 short assessments of the entire document:
+    - completeness_assessment: Is the document missing standard protections?
+    - risk_assessment: What is the biggest overall risk? (1 concise sentence, under 15 words)
+    - risk_sources: A list of 1-3 section names or clause titles that are the source of this risk (e.g. ["Section 2", "Confidentiality"]).
+    - readability_assessment: Is the language clear or complex?
+    - fairness_summary: A short, 3-to-6 word label stating who the document favors (e.g. 'Favors Twitter\\'s board and management', 'Document appears board-favorable', or 'Balanced').
+    - fairness_details: A 1-2 sentence explanation of why it favors them, written in clear, neutral, and cautious terms. Do not make strong legal conclusions.
+    - fairness_sources: A list of 1-3 section names or clause titles that are the source of this fairness assessment.
+
+    Document Text:
     {text}
 
     Return strictly valid JSON in this exact structure:
-    {{"executive_summary": "...", "red_flags": ["Optional array of critical legal issues"], "clauses": [{{"clause_type": "...", "summary": "...", "risk_level": "low/medium/high", "extracted_text": "...", "risk_explanation": "...", "confidence_score": 0.9}}]}}
+    {{"executive_summary": "...", "completeness_assessment": "...", "risk_assessment": "...", "risk_sources": ["..."], "readability_assessment": "...", "fairness_summary": "...", "fairness_details": "...", "fairness_sources": ["..."], "red_flags": ["Optional array of critical legal issues"], "clauses": [{{"clause_type": "...", "summary": "...", "risk_level": "low/medium/high", "extracted_text": "...", "risk_explanation": "...", "confidence_score": 0.9}}]}}
     """
 
     try:
         result = call_llm(prompt, json_mode=True)
-        data = json.loads(result)
+        data = _parse_json(result)
         
         parsed_clauses = []
         for c in data.get("clauses", []):
             conf = c.get("confidence_score", 0.85)
             if not isinstance(conf, (int, float)):
                 conf = 0.85
-            parsed_clauses.append(SimpleNamespace(
+            parsed_clauses.append(ExtractedClause(
                 clause_type=c.get("clause_type", "General").lower(),
                 confidence=float(conf),
                 summary=c.get("summary", "No summary provided"),
@@ -186,19 +218,30 @@ def extract_clauses(text, contract_name="Contract"):
         # Determine overall system risk dynamically (Calibrated threshold)
         overall_risk_level = "low"
         
-        # High overall risk: Has actual red flags, or 3+ high-risk clauses.
-        if actual_red_flags or high_count >= 3:
+        # Check if any red flags are critically severe based on business logic
+        has_critical_flags = any(
+            any(w in f.lower() for w in ["missing", "failure", "breach", "liability", "indemnif", "cap", "critical"])
+            for f in actual_red_flags
+        )
+        
+        # High Risk: Critical flags present or multiple high-risk clauses
+        if has_critical_flags or high_count >= 2:
             overall_risk_level = "high"
-        # Medium overall risk: Has 1-2 high-risk clause, or 2+ medium-risk clauses.
-        elif high_count >= 1 or med_count >= 2:
+        # Medium Risk: Any minor red flags, 1 high-risk clause, or multiple medium-risk clauses
+        elif actual_red_flags or high_count >= 1 or med_count >= 2:
             overall_risk_level = "medium"
-        elif med_count == 1:
-            overall_risk_level = "low" # Single medium risk is often standard
 
-        return SimpleNamespace(
+        return ContractAnalysis(
             contract_name=contract_name,
             overall_risk_level=overall_risk_level,
             executive_summary=data.get("executive_summary", "Contract analysis complete."),
+            completeness_assessment=data.get("completeness_assessment", "Standard protections included."),
+            risk_assessment=data.get("risk_assessment", "Standard obligations."),
+            risk_sources=data.get("risk_sources", []),
+            readability_assessment=data.get("readability_assessment", "Standard legal language."),
+            fairness_summary=data.get("fairness_summary", "Balanced"),
+            fairness_details=data.get("fairness_details", "Balanced obligations."),
+            fairness_sources=data.get("fairness_sources", []),
             red_flags=actual_red_flags,
             missing_clauses=[],
             clauses=parsed_clauses
@@ -207,7 +250,7 @@ def extract_clauses(text, contract_name="Contract"):
         print("Intelligent extraction failed, using fallback:", e)
         # Fallback if the AI fails
         clauses = [
-            SimpleNamespace(
+            ExtractedClause(
                 clause_type="general clause",
                 confidence=0.8,
                 summary="Fallback extraction.",
@@ -216,10 +259,15 @@ def extract_clauses(text, contract_name="Contract"):
                 extracted_text="Extraction failed structure parsing."
             )
         ]
-        return SimpleNamespace(
+        return ContractAnalysis(
             contract_name=contract_name,
             overall_risk_level="medium",
             executive_summary="Fallback summary.",
+            completeness_assessment="Extraction failed; cannot determine completeness.",
+            risk_assessment="Extraction failed; fallback risk is medium.",
+            readability_assessment="Extraction failed; cannot assess readability.",
+            fairness_summary="Extraction failed",
+            fairness_details="Extraction failed; cannot assess fairness.",
             red_flags=[],
             missing_clauses=[],
             clauses=clauses
@@ -229,15 +277,15 @@ def extract_clauses(text, contract_name="Contract"):
 def answer_question(question, context, chat_history, chunks_used=None):
 
     prompt = f"""
-    You are a highly helpful, extremely user-friendly legal assistant helping an everyday person understand their contract.
+    You are a highly helpful, extremely user-friendly AI Contract Reviewer helping an everyday person understand their document.
+    DISCLAIMER: You are a software tool, not a lawyer. You do not provide legal advice.
     Based ONLY on the context below, answer the user's question directly.
     - strictly NO repeating or continuing the user's question. Start your response immediately with the answer.
-    - Explain things simply and conversationally in 2-4 sentences.
-    - Use bullet points if listing multiple requirements or dates.
-    - Bold important terms or deadlines so they are easy to spot.
+    - Format lists or multiple items using bullet points for readability.
+    - NEVER use the word "you" or "your" (e.g. "You will get paid"). Instead, use the formal role from the document (e.g. "the Executive", "the Employee", "the Client").
     - strictly NO legal jargon. Instead of "Indemnification", say "Protecting from lawsuits".
     - If it's a yes/no question, strictly start your answer with a clear "Yes." or "No.".
-    - If the context does NOT explicitly contain the answer, do not guess! You MUST firmly state: "The contract does not specify."
+    - If the context does NOT explicitly contain the answer, do not guess! You MUST firmly state: "The document does not specify."
     
     Context:
     {context}
@@ -259,14 +307,16 @@ def answer_question(question, context, chat_history, chunks_used=None):
             
         for c in chunks_used[:3]:
             ct = c.get("metadata", {}).get("clause_type")
-            if ct and ct.lower() != "other" and ct.title() not in sources:
+            if not ct or ct.lower() == "other":
+                ct = "Document Section"
+            if ct.title() not in sources:
                 sources.append(ct.title())
 
     if "docs not specify" in result.lower() or "does not specify" in result.lower():
         confidence = 0.3
         caveat = "The contract text provided likely does not contain this information."
 
-    return SimpleNamespace(
+    return ChatAnswer(
         answer=result,
         confidence=confidence,
         sources=sources,
@@ -276,14 +326,15 @@ def answer_question(question, context, chat_history, chunks_used=None):
 # ── Dynamic Q&A ───────────────────────────────────────────────────────────────
 def generate_dynamic_questions(summary: str) -> List[str]:
     prompt = f"""
-    You are an AI contract analyst helping a regular person. Based ONLY on the contract text, generate exactly 3 simple, important questions a LAYMAN (someone not a lawyer) would ask.
+    You are an AI document analyst helping a regular person. Based ONLY on the document text, generate exactly 3 simple, important questions a LAYMAN (someone not a lawyer) would ask.
     
     CRITICAL RULES: 
-    1. LAYMAN LANGUAGE: Use plain English (e.g., "Can I cancel this?", "When do I get paid?", "What are my risks?").
+    1. LAYMAN LANGUAGE: Use plain English (e.g., "Can I cancel this?", "When do I get paid?").
     2. PRACTICAL & SHORT: Focus on money, dates, and how to get out. Keep questions under 12 words.
-    3. SPECIFIC: Don't be generic. If it's an NDA, ask about "secrets". If it's a rental, ask about "pests" or "deposit".
+    3. MIXED PHRASING: Include a mix of simple questions and one professional phrasing (e.g., "What confidential information is protected?").
+    4. SPECIFIC: Don't be generic. If it's a rental, ask about "deposit".
     
-    Contract Text:
+    Document Text:
     {summary}
     
     Return EXACTLY 3 layman questions in valid JSON:
@@ -292,7 +343,7 @@ def generate_dynamic_questions(summary: str) -> List[str]:
     
     try:
         result = call_llm(prompt, json_mode=True)
-        data = json.loads(result)
+        data = _parse_json(result)
         return data.get("questions", [])[:3]
     except Exception as e:
         print("Failed to generate dynamic questions via Groq:", e)
