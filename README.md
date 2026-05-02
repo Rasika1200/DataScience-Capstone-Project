@@ -1,4 +1,4 @@
-# ClauseWise Copilot: AI-Powered Contract Review & Risk Analysis
+# ClauseWise: AI-Powered Contract Review & Risk Analysis
 
 ## 📌 Project Overview
 **ClauseWise Copilot** is a high-performance, full-stack enterprise application designed to ingest, analyze, and interrogate complex legal contracts instantly. Built for the DATS 6501 Capstone project at George Washington University, the platform replaces hours of manual legal review with a robust Retrieval-Augmented Generation (RAG) pipeline and a human-in-the-loop validation workflow.
